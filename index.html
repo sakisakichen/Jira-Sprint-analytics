@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jira Sprint Analytics Pipeline</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #07080f;
+    --surface: #0e1019;
+    --surface2: #141620;
+    --border: #1e2130;
+    --accent: #4f8ef7;
+    --accent2: #38e8c5;
+    --accent3: #f97316;
+    --red: #f43f5e;
+    --text: #e2e8f4;
+    --muted: #6b7a99;
+    --code-bg: #090c14;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* GRID BACKGROUND */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(79,142,247,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79,142,247,0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* NAV */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 48px;
+    background: rgba(7,8,15,0.85);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .nav-brand {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 15px;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .nav-links { display: flex; gap: 32px; }
+  .nav-links a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    transition: color 0.2s;
+  }
+  .nav-links a:hover { color: var(--text); }
+
+  /* SECTIONS */
+  section { position: relative; z-index: 1; }
+
+  /* HERO */
+  #hero {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    padding: 120px 48px 80px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .hero-content { max-width: 760px; }
+
+  .hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(79,142,247,0.1);
+    border: 1px solid rgba(79,142,247,0.25);
+    border-radius: 100px;
+    padding: 6px 16px;
+    font-size: 12px;
+    color: var(--accent);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    animation: fadeUp 0.6s ease both;
+  }
+
+  .hero-eyebrow::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(42px, 6vw, 72px);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin-bottom: 24px;
+    animation: fadeUp 0.6s 0.1s ease both;
+  }
+
+  h1 .highlight {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-desc {
+    font-size: 17px;
+    color: var(--muted);
+    max-width: 580px;
+    margin-bottom: 40px;
+    font-weight: 300;
+    animation: fadeUp 0.6s 0.2s ease both;
+  }
+
+  .hero-stats {
+    display: flex;
+    gap: 40px;
+    margin-bottom: 48px;
+    animation: fadeUp 0.6s 0.3s ease both;
+  }
+
+  .stat { border-left: 2px solid var(--accent); padding-left: 16px; }
+  .stat-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1;
+  }
+  .stat-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px; }
+
+  .hero-actions {
+    display: flex;
+    gap: 16px;
+    animation: fadeUp 0.6s 0.4s ease both;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s;
+    cursor: pointer;
+    border: none;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { background: #6ba3ff; transform: translateY(-1px); }
+
+  .btn-outline {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* TECH STACK */
+  #stack {
+    padding: 80px 48px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .section-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 12px;
+  }
+
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 700;
+    margin-bottom: 48px;
+    letter-spacing: -0.01em;
+  }
+
+  .tech-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+  }
+
+  .tech-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .tech-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .tech-card:hover { border-color: rgba(79,142,247,0.3); transform: translateY(-2px); }
+  .tech-card:hover::before { opacity: 1; }
+
+  .tech-icon {
+    font-size: 28px;
+    margin-bottom: 12px;
+  }
+
+  .tech-name {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 4px;
+  }
+
+  .tech-desc { font-size: 13px; color: var(--muted); }
+
+  /* CHARTS SECTION */
+  #charts {
+    padding: 80px 48px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .chart-card.wide { grid-column: 1 / -1; }
+
+  .chart-header { margin-bottom: 24px; }
+  .chart-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    margin-bottom: 4px;
+  }
+  .chart-subtitle { font-size: 12px; color: var(--muted); }
+
+  .chart-container { position: relative; height: 260px; }
+  .chart-container.tall { height: 320px; }
+
+  .threshold-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--red);
+    font-family: 'DM Mono', monospace;
+    margin-top: 12px;
+  }
+
+  .threshold-note::before {
+    content: '';
+    width: 24px; height: 2px;
+    background: var(--red);
+    display: inline-block;
+  }
+
+  /* KPI CARDS */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+  }
+
+  .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+  .kpi-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 32px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .kpi-value.danger { color: var(--red); }
+  .kpi-value.warning { color: var(--accent3); }
+  .kpi-value.accent { color: var(--accent2); }
+
+  /* CODE SECTION */
+  #code {
+    padding: 80px 48px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .code-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tab-btn {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.2s;
+  }
+
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-btn:hover:not(.active) { color: var(--text); }
+
+  .code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    padding: 28px;
+    overflow-x: auto;
+    display: none;
+  }
+
+  .code-block.active { display: block; }
+
+  pre {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    line-height: 1.8;
+    color: #a8b4d0;
+    white-space: pre;
+  }
+
+  .kw { color: #7c9ef7; }
+  .fn { color: #38e8c5; }
+  .str { color: #a3e678; }
+  .cm { color: #4a5570; font-style: italic; }
+  .num { color: #f97316; }
+  .var { color: #e2e8f4; }
+
+  /* PIPELINE */
+  #pipeline {
+    padding: 80px 48px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .pipeline-steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    position: relative;
+  }
+
+  .pipeline-steps::before {
+    content: '';
+    position: absolute;
+    top: 28px;
+    left: calc(16.66% + 28px);
+    right: calc(16.66% + 28px);
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent3));
+    z-index: 0;
+  }
+
+  .step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 0 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .step-num {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    margin-bottom: 20px;
+    border: 2px solid;
+  }
+
+  .step:nth-child(1) .step-num { background: rgba(79,142,247,0.1); border-color: var(--accent); color: var(--accent); }
+  .step:nth-child(2) .step-num { background: rgba(56,232,197,0.1); border-color: var(--accent2); color: var(--accent2); }
+  .step:nth-child(3) .step-num { background: rgba(249,115,22,0.1); border-color: var(--accent3); color: var(--accent3); }
+
+  .step-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; margin-bottom: 8px; }
+  .step-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .step-tag {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+  }
+  .step:nth-child(1) .step-tag { background: rgba(79,142,247,0.1); color: var(--accent); }
+  .step:nth-child(2) .step-tag { background: rgba(56,232,197,0.1); color: var(--accent2); }
+  .step:nth-child(3) .step-tag { background: rgba(249,115,22,0.1); color: var(--accent3); }
+
+  /* FOOTER */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 32px 48px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    position: relative;
+    z-index: 1;
+  }
+
+  footer span { color: var(--accent); }
+
+  /* SCROLL REVEAL */
+  .reveal {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 768px) {
+    nav { padding: 16px 24px; }
+    #hero, #stack, #charts, #code, #pipeline { padding-left: 24px; padding-right: 24px; }
+    .charts-grid { grid-template-columns: 1fr; }
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .pipeline-steps { grid-template-columns: 1fr; gap: 32px; }
+    .pipeline-steps::before { display: none; }
+    .hero-stats { gap: 24px; }
+    .nav-links { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">Sprint Analytics</div>
+  <div class="nav-links">
+    <a href="#stack">Stack</a>
+    <a href="#pipeline">Pipeline</a>
+    <a href="#charts">Dashboard</a>
+    <a href="#code">Code</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-content">
+    <div class="hero-eyebrow">Python · Jira API · Data Pipeline</div>
+    <h1>Jira Sprint<br><span class="highlight">Analytics Pipeline</span></h1>
+    <p class="hero-desc">
+      An end-to-end automated pipeline that extracts sprint data from Jira Cloud across 20+ Agile teams,
+      transforms it, and delivers a formatted Excel dashboard — replacing hours of manual reporting with a single command.
+    </p>
+    <div class="hero-stats">
+      <div class="stat">
+        <div class="stat-num">20+</div>
+        <div class="stat-label">Agile Teams</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">7</div>
+        <div class="stat-label">JQL Queries</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">3K+</div>
+        <div class="stat-label">Issues Processed</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">4</div>
+        <div class="stat-label">Dashboard Sheets</div>
+      </div>
+    </div>
+    <div class="hero-actions">
+      <a href="#charts" class="btn btn-primary">View Dashboard →</a>
+      <a href="#code" class="btn btn-outline">See the Code</a>
+    </div>
+  </div>
+</section>
+
+<!-- PIPELINE -->
+<section id="pipeline">
+  <div class="reveal">
+    <div class="section-label">How it works</div>
+    <div class="section-title">Two-Step Pipeline</div>
+  </div>
+  <div class="pipeline-steps reveal">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-title">Extract</div>
+      <div class="step-desc">Authenticates with Jira Cloud API, runs 7 JQL queries, handles pagination via nextPageToken to bypass the 1,000-record limit</div>
+      <span class="step-tag">jira_all_queries.py</span>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-title">Transform</div>
+      <div class="step-desc">Merges all results, filters by team T-number, flags data quality issues, computes story hours and gap-to-standard metrics</div>
+      <span class="step-tag">pandas</span>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-title">Visualize</div>
+      <div class="step-desc">Generates a 4-sheet Excel dashboard with color-coded tables, embedded bar + line combo charts, and KPI summary cards</div>
+      <span class="step-tag">visualization_excel_v5.py</span>
+    </div>
+  </div>
+</section>
+
+<!-- TECH STACK -->
+<section id="stack">
+  <div class="reveal">
+    <div class="section-label">Technologies</div>
+    <div class="section-title">Tech Stack</div>
+  </div>
+  <div class="tech-grid reveal">
+    <div class="tech-card">
+      <div class="tech-icon">🐍</div>
+      <div class="tech-name">Python 3.11</div>
+      <div class="tech-desc">Core scripting, data transformation, orchestration</div>
+    </div>
+    <div class="tech-card">
+      <div class="tech-icon">🔌</div>
+      <div class="tech-name">Jira REST API v3</div>
+      <div class="tech-desc">/rest/api/3/search/jql with nextPageToken pagination</div>
+    </div>
+    <div class="tech-card">
+      <div class="tech-icon">🐼</div>
+      <div class="tech-name">pandas</div>
+      <div class="tech-desc">Aggregation, filtering, data quality flagging</div>
+    </div>
+    <div class="tech-card">
+      <div class="tech-icon">📊</div>
+      <div class="tech-name">openpyxl</div>
+      <div class="tech-desc">Excel automation — charts, conditional formatting, multi-sheet workbooks</div>
+    </div>
+    <div class="tech-card">
+      <div class="tech-icon">🔐</div>
+      <div class="tech-name">HTTP Basic Auth</div>
+      <div class="tech-desc">Secure Jira Cloud authentication via API token</div>
+    </div>
+    <div class="tech-card">
+      <div class="tech-icon">🔎</div>
+      <div class="tech-name">Regex</div>
+      <div class="tech-desc">Sprint T-number extraction for numeric sorting</div>
+    </div>
+  </div>
+</section>
+
+<!-- DASHBOARD CHARTS -->
+<section id="charts">
+  <div class="reveal">
+    <div class="section-label">Live Preview</div>
+    <div class="section-title">Dashboard Simulation</div>
+  </div>
+
+  <div class="kpi-row reveal">
+    <div class="kpi-card">
+      <div class="kpi-label">Total Stories</div>
+      <div class="kpi-value accent">1,247</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Story Hours Logged</div>
+      <div class="kpi-value">21,651</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Sprints Below 640 hrs</div>
+      <div class="kpi-value danger">8</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Missing Story Points</div>
+      <div class="kpi-value warning">143</div>
+    </div>
+  </div>
+
+  <div class="charts-grid reveal">
+    <!-- Bar + Line Chart -->
+    <div class="chart-card wide">
+      <div class="chart-header">
+        <div class="chart-title">Story Hours per Sprint</div>
+        <div class="chart-subtitle">All teams — sorted by T number</div>
+      </div>
+      <div class="chart-container tall">
+        <canvas id="hoursChart"></canvas>
+      </div>
+      <div class="threshold-note">640 hr standard threshold</div>
+    </div>
+
+    <!-- Donut Chart -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Story Points Coverage</div>
+        <div class="chart-subtitle">Stories with vs. without estimates</div>
+      </div>
+      <div class="chart-container">
+        <canvas id="donutChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Flag breakdown -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Data Quality Flags</div>
+        <div class="chart-subtitle">No Assignee or No Hours by Sprint</div>
+      </div>
+      <div class="chart-container">
+        <canvas id="flagChart"></canvas>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CODE SNIPPETS -->
+<section id="code">
+  <div class="reveal">
+    <div class="section-label">Implementation</div>
+    <div class="section-title">Code Highlights</div>
+  </div>
+
+  <div class="reveal">
+    <div class="code-tabs">
+      <button class="tab-btn active" onclick="showTab('pagination')">Pagination</button>
+      <button class="tab-btn" onclick="showTab('transform')">Transform</button>
+      <button class="tab-btn" onclick="showTab('chart')">Excel Chart</button>
+    </div>
+
+    <div class="code-block active" id="tab-pagination">
+<pre><span class="cm"># Bypasses Jira's 1,000-record limit using nextPageToken</span>
+<span class="kw">def</span> <span class="fn">fetch_issues</span>(<span class="var">jql</span>):
+    <span class="var">url</span> = <span class="str">f"{JIRA_URL}rest/api/3/search/jql"</span>
+    <span class="var">all_issues</span>, <span class="var">next_page_token</span> = [], <span class="kw">None</span>
+
+    <span class="kw">while</span> <span class="kw">True</span>:
+        <span class="var">params</span> = {<span class="str">"jql"</span>: <span class="var">jql</span>, <span class="str">"maxResults"</span>: <span class="num">50</span>, <span class="str">"fields"</span>: <span class="var">FIELDS</span>}
+        <span class="kw">if</span> <span class="var">next_page_token</span>:
+            <span class="var">params</span>[<span class="str">"nextPageToken"</span>] = <span class="var">next_page_token</span>
+
+        <span class="var">response</span> = <span class="var">requests</span>.<span class="fn">get</span>(<span class="var">url</span>, <span class="var">headers</span>=<span class="var">headers</span>,
+                            <span class="var">params</span>=<span class="var">params</span>, <span class="var">auth</span>=<span class="var">auth</span>, <span class="var">verify</span>=<span class="kw">False</span>)
+        <span class="var">data</span> = <span class="var">response</span>.<span class="fn">json</span>()
+        <span class="var">all_issues</span>.<span class="fn">extend</span>(<span class="var">data</span>.<span class="fn">get</span>(<span class="str">"issues"</span>, []))
+
+        <span class="var">next_page_token</span> = <span class="var">data</span>.<span class="fn">get</span>(<span class="str">"nextPageToken"</span>)
+        <span class="kw">if not</span> <span class="var">next_page_token</span>: <span class="kw">break</span>
+
+    <span class="kw">return</span> <span class="var">all_issues</span></pre>
+    </div>
+
+    <div class="code-block" id="tab-transform">
+<pre><span class="cm"># Regex-based sprint T-number extraction for correct numeric sorting</span>
+<span class="kw">def</span> <span class="fn">extract_sprint_num</span>(<span class="var">sprint_name</span>):
+    <span class="kw">if</span> <span class="var">pd</span>.<span class="fn">isna</span>(<span class="var">sprint_name</span>): <span class="kw">return</span> <span class="num">9999</span>
+    <span class="var">matches</span> = <span class="var">re</span>.<span class="fn">findall</span>(<span class="str">r'T(\d+)'</span>, <span class="fn">str</span>(<span class="var">sprint_name</span>))
+    <span class="kw">return</span> <span class="fn">int</span>(<span class="var">matches</span>[<span class="num">-1</span>]) <span class="kw">if</span> <span class="var">matches</span> <span class="kw">else</span> <span class="num">9999</span>
+
+<span class="cm"># Data quality flagging — No Assignee OR No Hours (Story only)</span>
+<span class="var">df_stories</span> = <span class="var">df_filtered</span>[
+    <span class="var">df_filtered</span>[<span class="str">"Issue Type"</span>].<span class="fn">str.lower</span>() == <span class="str">"story"</span>
+].<span class="fn">copy</span>()
+
+<span class="var">no_assignee</span> = <span class="var">df_stories</span>[<span class="str">"Assignee"</span>].<span class="fn">isna</span>()
+<span class="var">no_hours</span>    = <span class="var">df_stories</span>[<span class="str">"Sigma Time Spent (hrs)"</span>].<span class="fn">isna</span>()
+
+<span class="var">flagged</span>[<span class="str">"Issue Flag"</span>] = <span class="var">flagged</span>.<span class="fn">apply</span>(
+    <span class="kw">lambda</span> <span class="var">r</span>: <span class="str">"No Assignee &amp; No Hours"</span> <span class="kw">if</span> <span class="var">r</span>[<span class="str">"No Assignee"</span>] <span class="kw">and</span> <span class="var">r</span>[<span class="str">"No Hours"</span>]
+    <span class="kw">else</span> (<span class="str">"No Assignee"</span> <span class="kw">if</span> <span class="var">r</span>[<span class="str">"No Assignee"</span>] <span class="kw">else</span> <span class="str">"No Hours"</span>),
+    <span class="var">axis</span>=<span class="num">1</span>
+)</pre>
+    </div>
+
+    <div class="code-block" id="tab-chart">
+<pre><span class="cm"># Combo chart: BarChart + LineChart for threshold reference line</span>
+<span class="kw">from</span> <span class="var">openpyxl.chart</span> <span class="kw">import</span> <span class="var">BarChart</span>, <span class="var">LineChart</span>, <span class="var">Reference</span>
+<span class="kw">from</span> <span class="var">openpyxl.chart.label</span> <span class="kw">import</span> <span class="var">DataLabelList</span>
+
+<span class="var">chart</span> = <span class="fn">BarChart</span>()
+<span class="var">chart</span>.<span class="var">type</span> = <span class="str">"col"</span>
+<span class="var">chart</span>.<span class="var">title</span> = <span class="str">"Story Hours per Sprint"</span>
+
+<span class="var">story_ref</span> = <span class="fn">Reference</span>(<span class="var">ws</span>, <span class="var">min_col</span>=<span class="num">3</span>, <span class="var">min_row</span>=<span class="num">4</span>, <span class="var">max_row</span>=<span class="var">last_row</span>)
+<span class="var">cats_ref</span>  = <span class="fn">Reference</span>(<span class="var">ws</span>, <span class="var">min_col</span>=<span class="num">6</span>, <span class="var">min_row</span>=<span class="num">5</span>, <span class="var">max_row</span>=<span class="var">last_row</span>)
+<span class="var">chart</span>.<span class="fn">add_data</span>(<span class="var">story_ref</span>, <span class="var">titles_from_data</span>=<span class="kw">True</span>)
+<span class="var">chart</span>.<span class="fn">set_categories</span>(<span class="var">cats_ref</span>)
+<span class="var">chart</span>.<span class="var">series</span>[<span class="num">0</span>].<span class="var">graphicalProperties</span>.<span class="var">solidFill</span> = <span class="str">"2E75B6"</span>
+
+<span class="cm"># Add 640hr threshold as a line overlay</span>
+<span class="var">line</span> = <span class="fn">LineChart</span>()
+<span class="var">line_ref</span> = <span class="fn">Reference</span>(<span class="var">ws</span>, <span class="var">min_col</span>=<span class="num">7</span>, <span class="var">min_row</span>=<span class="num">4</span>, <span class="var">max_row</span>=<span class="var">last_row</span>)
+<span class="var">line</span>.<span class="fn">add_data</span>(<span class="var">line_ref</span>, <span class="var">titles_from_data</span>=<span class="kw">True</span>)
+<span class="var">line</span>.<span class="var">series</span>[<span class="num">0</span>].<span class="var">graphicalProperties</span>.<span class="var">line</span>.<span class="var">solidFill</span> = <span class="str">"FF0000"</span>
+
+<span class="var">chart</span> += <span class="var">line</span>  <span class="cm"># merge into combo chart</span></pre>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Built with <span>Python · Jira API · openpyxl · pandas</span> — CS122 C2 Sprint Analytics Pipeline
+</footer>
+
+<script>
+// ── CHARTS ──────────────────────────────────────────────────────────
+const sprints = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12','T35','T36','T37','T38','T39','T40'];
+const storyHours = [890, 742, 1240, 980, 620, 810, 1100, 560, 930, 780, 1050, 670, 540, 990, 1180, 430, 760, 880];
+const threshold = Array(sprints.length).fill(640);
+
+// Bar + Line combo
+const hoursCtx = document.getElementById('hoursChart').getContext('2d');
+new Chart(hoursCtx, {
+  data: {
+    labels: sprints,
+    datasets: [
+      {
+        type: 'bar',
+        label: 'Story Hours',
+        data: storyHours,
+        backgroundColor: storyHours.map(v => v < 640 ? 'rgba(244,63,94,0.7)' : 'rgba(79,142,247,0.7)'),
+        borderColor: storyHours.map(v => v < 640 ? '#f43f5e' : '#4f8ef7'),
+        borderWidth: 1,
+        borderRadius: 4,
+      },
+      {
+        type: 'line',
+        label: '640 hr Standard',
+        data: threshold,
+        borderColor: '#f43f5e',
+        borderWidth: 2,
+        borderDash: [6, 3],
+        pointRadius: 0,
+        fill: false,
+        tension: 0,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { labels: { color: '#6b7a99', font: { family: 'DM Mono', size: 11 } } },
+      tooltip: { backgroundColor: '#0e1019', borderColor: '#1e2130', borderWidth: 1, titleColor: '#e2e8f4', bodyColor: '#6b7a99' }
+    },
+    scales: {
+      x: { ticks: { color: '#6b7a99', font: { family: 'DM Mono', size: 11 } }, grid: { color: '#1e2130' } },
+      y: { ticks: { color: '#6b7a99', font: { family: 'DM Mono', size: 11 } }, grid: { color: '#1e2130' } }
+    }
+  }
+});
+
+// Donut
+const donutCtx = document.getElementById('donutChart').getContext('2d');
+new Chart(donutCtx, {
+  type: 'doughnut',
+  data: {
+    labels: ['Has Story Points', 'Missing Story Points'],
+    datasets: [{ data: [1104, 143], backgroundColor: ['rgba(56,232,197,0.7)', 'rgba(249,115,22,0.7)'], borderColor: ['#38e8c5', '#f97316'], borderWidth: 1 }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '65%',
+    plugins: {
+      legend: { position: 'bottom', labels: { color: '#6b7a99', font: { family: 'DM Mono', size: 11 }, padding: 16 } },
+      tooltip: { backgroundColor: '#0e1019', borderColor: '#1e2130', borderWidth: 1, titleColor: '#e2e8f4', bodyColor: '#6b7a99' }
+    }
+  }
+});
+
+// Flags
+const flagCtx = document.getElementById('flagChart').getContext('2d');
+new Chart(flagCtx, {
+  type: 'bar',
+  data: {
+    labels: ['T1','T3','T4','T5','T7','T9','T35','T38'],
+    datasets: [
+      { label: 'No Assignee & No Hours', data: [12, 8, 15, 5, 9, 11, 6, 7], backgroundColor: 'rgba(244,63,94,0.7)', borderRadius: 3 },
+      { label: 'No Assignee', data: [5, 3, 7, 2, 4, 6, 3, 4], backgroundColor: 'rgba(249,115,22,0.7)', borderRadius: 3 },
+      { label: 'No Hours', data: [8, 6, 10, 4, 7, 5, 8, 5], backgroundColor: 'rgba(255,215,0,0.6)', borderRadius: 3 },
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: { stacked: true, ticks: { color: '#6b7a99', font: { family: 'DM Mono', size: 11 } }, grid: { color: '#1e2130' } },
+      y: { stacked: true, ticks: { color: '#6b7a99', font: { family: 'DM Mono', size: 11 } }, grid: { color: '#1e2130' } }
+    },
+    plugins: {
+      legend: { labels: { color: '#6b7a99', font: { family: 'DM Mono', size: 11 } } },
+      tooltip: { backgroundColor: '#0e1019', borderColor: '#1e2130', borderWidth: 1, titleColor: '#e2e8f4', bodyColor: '#6b7a99' }
+    }
+  }
+});
+
+// ── TABS ────────────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.code-block').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ── SCROLL REVEAL ───────────────────────────────────────────────────
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
